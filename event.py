@@ -42,6 +42,7 @@ class EventWrapper():
         appt.ReminderSet = not is_past
         appt.ReminderMinutesBeforeStart = 15
         appt.BusyStatus = 2 # 2 = olBusy
+        appt.Categories = "Vorlesung"
 
         appt.Organizer = self.organizer
         appt.Save()
