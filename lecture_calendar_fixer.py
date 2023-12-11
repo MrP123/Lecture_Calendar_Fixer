@@ -13,7 +13,7 @@ def delete_all_existing_lecture_events(outlook):
     outlook_calendar = outlook.GetNamespace("MAPI").GetDefaultFolder(9) #calender = 9
     appointments = outlook_calendar.Items
 
-    found_appointments = [appointment for appointment in appointments if getattr(appointment, "Organizer", "Error") == EventWrapper.get_default_organizer()]
+    found_appointments = [appointment for appointment in appointments if EventWrapper.get_default_organizer() in getattr(appointment, "Organizer", "Error")]
     logging.info(F"Found {len(found_appointments)} appointments")
 
     should_retry = 1
