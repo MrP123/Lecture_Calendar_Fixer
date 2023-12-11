@@ -4,7 +4,7 @@ import pywintypes
 
 from datetime import datetime
 
-from config import get_travel_time
+from config import get_travel_time, at_different_location
 
 class EventWrapper():
 
@@ -41,24 +41,30 @@ class EventWrapper():
         appt.Subject = self.subject
         appt.Duration = self.duration # In minutes (60 Minutes)
         appt.Location = self.location
+        
+        appt.BusyStatus = 2 # 2 = olBusy
+        appt.Organizer = self.organizer
 
         #by default handle events as if they were past events
         is_past = True
         if self.start_dt:
             is_past = self.start_dt < datetime.now(self.start_dt.tzinfo)
 
+        #default values for category and reminder time --> ToDo: move to config.py .env
+        category = "Vorlesung"
         reminder_time = 15
+
         if self.location != "-":
-            # check if location is in mci_travel_times
             mci_location = self.location.split("/ ")[1]
-            reminder_time += get_travel_time(mci_location)
+
+            if at_different_location(mci_location):
+                category = "Vorlesung-Anderer-Standort"
+                reminder_time += get_travel_time(mci_location)
 
         appt.ReminderSet = not is_past
-        appt.ReminderMinutesBeforeStart = reminder_time
-        appt.BusyStatus = 2 # 2 = olBusy
-        appt.Categories = "Vorlesung"
+        appt.ReminderMinutesBeforeStart = reminder_time       
+        appt.Categories = category
 
-        appt.Organizer = self.organizer
         appt.Save()
         appt.Send()
         return appt

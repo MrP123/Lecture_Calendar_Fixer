@@ -1,3 +1,8 @@
+
+def at_different_location(location: str) -> bool:
+    """Check if the event is at a different location than MCI IV"""
+    return location != "MCI IV"
+
 def get_travel_time(location: str) -> int:
     """Get travel time in minutes from MCI IV to the specified MCI location"""
     

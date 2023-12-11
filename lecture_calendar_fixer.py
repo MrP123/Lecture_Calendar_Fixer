@@ -107,7 +107,7 @@ if __name__ == "__main__":
     webcalendar = icalendar.Calendar.from_ical(response.text)
     outlook = win32com.client.Dispatch("Outlook.Application")
 
-    #delete_all_existing_lecture_events(outlook)
+    #elete_all_existing_lecture_events(outlook)
     #add_lecture_events_to_outlook(webcalendar, outlook)
 
     update_changed_events(webcalendar, outlook)
