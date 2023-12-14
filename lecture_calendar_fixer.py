@@ -1,6 +1,7 @@
 import logging
 import datetime
 import os
+import hashlib
 
 from dotenv import load_dotenv
 import icalendar
@@ -88,11 +89,26 @@ def update_changed_events(webcalender, outlook):
             logging.info("\nAdding event:\n\t" + ical_event_wrapped)
             ical_event_wrapped.to_outlook_event(outlook)
 
+def update_hash_file(webcalendar):
+    # turn all events into a string and hash it
+    all_events = [subcomp for subcomp in webcalendar.subcomponents if subcomp.name == "VEVENT"]
+    full_string = "".join([str(EventWrapper.from_ical_event(event)) for event in all_events if not "Abgabetermin" in event['summary']])
+
+    with open("./.hash", "a+") as f:
+        f.seek(0)
+        old_hash = f.read()
+        new_hash = hashlib.sha256(str(full_string).encode('utf-8')).hexdigest()
+        if old_hash == new_hash:
+            logging.info("No changes in hash --> will continue anyway for now")
+        else:
+            logging.info("Hash changed --> will update")
+            f.truncate(0)
+            f.write(new_hash)
+
 if __name__ == "__main__":
     load_dotenv()
 
     logging.basicConfig(filename='full.log', encoding='utf-8', level=logging.DEBUG)
-    logging.basicConfig(filename='error.log', encoding='utf-8', level=logging.ERROR)
 
     # .env file with webcal link as http link must be available
     url = os.getenv("WEBCAL_URL")
@@ -100,14 +116,16 @@ if __name__ == "__main__":
     logging.info(F"Running at {datetime.datetime.now()}")
     try:
         response = requests.get(url)
-    except:
-        logging.error("Could not fetch calendar")
-        exit(1)
+    except requests.exceptions.RequestException as e:
+        logging.error(F"Could not fetch calendar: {e}")
+        exit(1)   
 
     webcalendar = icalendar.Calendar.from_ical(response.text)
+    update_hash_file(webcalendar)
+    
     outlook = win32com.client.Dispatch("Outlook.Application")
 
-    #elete_all_existing_lecture_events(outlook)
+    #delete_all_existing_lecture_events(outlook)
     #add_lecture_events_to_outlook(webcalendar, outlook)
 
     update_changed_events(webcalendar, outlook)
