@@ -16,8 +16,8 @@ class EventWrapper():
         self.start_dt = start_dt
         self.organizer = organizer if organizer else EventWrapper.get_default_organizer()
 
-    @staticmethod
-    def from_ical_event(event: ICalEvent):
+    @classmethod
+    def from_ical_event(cls, event: ICalEvent):
         subject = event['summary']
         start_dt = event['dtstart'].dt
         end_dt = event['dtend'].dt
@@ -27,13 +27,15 @@ class EventWrapper():
         location = location if location else "-"
 
         organizer = event.get('UID')
-        organizer = str(organizer) if organizer else EventWrapper.get_default_organizer()
+        organizer = str(organizer) if organizer else cls.get_default_organizer()
 
-        return EventWrapper(subject, start, dur, location, organizer=organizer, start_dt=start_dt)
+        return cls(subject, start, dur, location, organizer=organizer, start_dt=start_dt)
     
-    @staticmethod
-    def from_outlook_event(event):
-        return EventWrapper(event.Subject, event.Start, event.Duration, event.Location, event.Organizer)
+    @classmethod
+    def from_outlook_event(cls, event):
+        start_dt = datetime.fromtimestamp(timestamp=event.Start.timestamp(), tz=event.Start.tzinfo)
+        #convert pywintypes.datetime to datetime.datetime
+        return cls(event.Subject, event.Start, event.Duration, event.Location, event.Organizer, start_dt)
 
     def to_outlook_event(self, outlook: Outlook):
         appt = outlook.CreateItem(1) # AppointmentItem
