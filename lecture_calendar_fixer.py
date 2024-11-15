@@ -64,26 +64,28 @@ def update_changed_events(webcalender, outlook):
     all_events = [subcomp for subcomp in webcalendar.subcomponents if subcomp.name == "VEVENT"]
     lecture_events = [event for event in all_events if not "Abgabetermin" in event['summary']]
 
-    lecture_event_dict = {}
+    # create a dict of all found events
+    lecture_event_dict: dict[str, EventWrapper] = {}
     for event in lecture_events:
         ical_event_wrapped = EventWrapper.from_ical_event(event)
         lecture_event_dict[ical_event_wrapped.organizer] = ical_event_wrapped
 
     logging.info(F"Found {len(lecture_events)} ical events")
 
-    for event in lecture_events:
-        ical_event_wrapped = EventWrapper.from_ical_event(event)
-
+    for ical_event_wrapped in lecture_event_dict.values():
         # get corresponding outlook appointment from dict
         corresponding_outlook_appointment = outlook_appointment_dict.get(ical_event_wrapped.organizer)
-        if corresponding_outlook_appointment:
 
+        if corresponding_outlook_appointment:
             # if found wrap it for comparison
             outlook_appointment_wrapped = EventWrapper.from_outlook_event(corresponding_outlook_appointment)
+            
             if ical_event_wrapped != outlook_appointment_wrapped:
                 # event has changed --> delete and add again
                 logging.info(F"\nTrying to delete appointment:\n\t{outlook_appointment_wrapped}")
-                try_deleting_outlook_appointment(corresponding_outlook_appointment)
+                if try_deleting_outlook_appointment(corresponding_outlook_appointment):
+                    #also remove from dict
+                    del outlook_appointment_dict[ical_event_wrapped.organizer]
 
                 logging.info(F"\nAdding event:\n\t{ical_event_wrapped}")
                 ical_event_wrapped.to_outlook_event(outlook)
@@ -94,15 +96,17 @@ def update_changed_events(webcalender, outlook):
             logging.info(F"\nAdding event:\n\t{ical_event_wrapped}")
             ical_event_wrapped.to_outlook_event(outlook)
 
-    if len(found_appointments) > len(lecture_events):
-        for outlook_appointment in found_appointments:
+    # More outlook appointments than ical events --> something has been deleted in the ical events
+    if len(outlook_appointment_dict) > len(lecture_event_dict):
+        for outlook_appointment in outlook_appointment_dict.values():
             if not lecture_event_dict.get(outlook_appointment.Organizer):
                 outlook_appointment_wrapped = EventWrapper.from_outlook_event(outlook_appointment)
-
+                
                 #if the outlook appointment is not in the ical events then delete it only if it is in the future
                 if outlook_appointment_wrapped.start_dt > datetime.datetime.now(outlook_appointment_wrapped.start_dt.tzinfo):
                     logging.info(F"\nTrying to delete appointment:\n\t{outlook_appointment_wrapped}")
-                    try_deleting_outlook_appointment(outlook_appointment)
+                    if try_deleting_outlook_appointment(outlook_appointment):
+                        del outlook_appointment_dict[ical_event_wrapped.organizer]
 
 def update_hash_file(webcalendar):
     # turn all events into a string and hash it
