@@ -42,17 +42,16 @@ def add_lecture_events_to_outlook(webcalendar, outlook):
         logging.info(F"\nAdding event:\n\t{wrapper}")
         wrapper.to_outlook_event(outlook)
 
-def try_deleting_outlook_appointment(appointment):
-    should_retry = 1
-    tries = 0
-    while should_retry > 0 and tries < 5:   
-        tries += 1
-        should_retry -= 1
+def try_deleting_outlook_appointment(appointment) -> bool:
+    attempts = 0
+    while attempts < 5:   
         try:
-            appointment.Delete()
+            appointment.Delete() #failure to delete will raise an exception
+            return True
         except:
             logging.warn("Could not delete appointment")
-            should_retry += 1
+        attempts += 1
+    return False
 
 def update_changed_events(webcalender, outlook):
     outlook_calendar = outlook.GetNamespace("MAPI").GetDefaultFolder(9) #calender = 9
