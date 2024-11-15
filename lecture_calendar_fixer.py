@@ -122,12 +122,22 @@ def update_hash_file(webcalendar):
             f.write(new_hash)
 
 if __name__ == "__main__":
-    load_dotenv()
+    #Dynamically load the type info for the underlying COM object. This data can be generated with the following command:
+    #python .\.venv\Lib\site-packages\win32com\client\makepy.py -i "Microsoft Outlook 16.0 Object Library"
+    #This allows for accuarte type information when debugging
+    try:
+        win32com.client.gencache.EnsureModule('{00062FFF-0000-0000-C000-000000000046}', 0, 9, 6)
+    except Exception as e:
+        logging.debug(F"Could not ensure module for type data on COM object: {e}")
 
+    load_dotenv()
     logging.basicConfig(filename='full.log', encoding='utf-8', level=logging.DEBUG)
 
     # .env file with webcal link as http link must be available
     url = os.getenv("WEBCAL_URL")
+    if url is None:
+        logging.error("No webcal url found in .env file")
+        exit(1)
 
     logging.info(F"Running at {datetime.datetime.now()}")
     try:

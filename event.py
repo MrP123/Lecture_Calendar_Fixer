@@ -1,6 +1,5 @@
 from icalendar.cal import Event as ICalEvent
 from win32com.client.dynamic import CDispatch as Outlook
-import pywintypes
 
 from datetime import datetime
 
