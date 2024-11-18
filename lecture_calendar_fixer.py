@@ -129,10 +129,10 @@ if __name__ == "__main__":
     #Dynamically load the type info for the underlying COM object. This data can be generated with the following command:
     #python .\.venv\Lib\site-packages\win32com\client\makepy.py -i "Microsoft Outlook 16.0 Object Library"
     #This allows for accuarte type information when debugging
-    try:
-        win32com.client.gencache.EnsureModule('{00062FFF-0000-0000-C000-000000000046}', 0, 9, 6)
-    except Exception as e:
-        logging.debug(F"Could not ensure module for type data on COM object: {e}")
+    #try:
+    #    win32com.client.gencache.EnsureModule('{00062FFF-0000-0000-C000-000000000046}', 0, 9, 6)
+    #except Exception as e:
+    #    logging.debug(F"Could not ensure module for type data on COM object: {e}")
 
     load_dotenv()
     
