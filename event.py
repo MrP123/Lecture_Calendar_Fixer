@@ -44,6 +44,11 @@ class EventWrapper():
         appt.Location = self.location
         
         appt.BusyStatus = 2 # 2 = olBusy
+
+        #Organizer is actually supposed to be read-only, tough without the explicit typing of win32com genpy we can set it
+        #By default the organizer is automatically created and identical to the account from which the appointment is created
+        #In this case the organizer must be identical to the one from the icalendar/Designer event, so this hack is necessary
+        #ToDo: Check for a cleaner solution to achieve this
         appt.Organizer = self.organizer
 
         #by default handle events as if they were past events
