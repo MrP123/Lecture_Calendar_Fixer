@@ -2,6 +2,7 @@ import logging
 import datetime
 import os
 import hashlib
+from pathlib import Path
 
 from dotenv import load_dotenv
 import icalendar
@@ -134,7 +135,9 @@ if __name__ == "__main__":
         logging.debug(F"Could not ensure module for type data on COM object: {e}")
 
     load_dotenv()
-    logging.basicConfig(filename='full.log', encoding='utf-8', level=logging.DEBUG)
+    
+    logfile_path = Path(__file__).parent.resolve() / "full.log" #always logs into the same folder as the script, even when run from task scheduler
+    logging.basicConfig(filename=logfile_path, encoding='utf-8', level=logging.DEBUG)
 
     # .env file with webcal link as http link must be available
     url = os.getenv("WEBCAL_URL")
