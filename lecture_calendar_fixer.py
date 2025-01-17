@@ -29,7 +29,7 @@ def delete_all_existing_lecture_events(outlook):
             try:
                 appointment.Delete()
             except:
-                logging.warn("Could not delete appointment, adding retry")
+                logging.warning("Could not delete appointment, adding retry")
                 should_retry += 1
 
 def add_lecture_events_to_outlook(webcalendar, outlook):
@@ -50,7 +50,7 @@ def try_deleting_outlook_appointment(appointment) -> bool:
             appointment.Delete() #failure to delete will raise an exception
             return True
         except:
-            logging.warn("Could not delete appointment")
+            logging.warning("Could not delete appointment")
         attempts += 1
     return False
 
