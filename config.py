@@ -1,4 +1,8 @@
 
+def is_async_online_lecture(subject:str, room: str) -> bool:
+    """Check if an event is an asynchronous online lecutre"""
+    return "Geleitetes Selbststudium" in subject and room == "Online"
+
 def at_different_location(location: str) -> bool:
     """Check if the event is at a different location than MCI IV"""
     return location != "MCI IV"

@@ -3,7 +3,7 @@ from win32com.client.dynamic import CDispatch as Outlook
 
 from datetime import datetime
 
-from config import get_travel_time, at_different_location
+from config import get_travel_time, at_different_location, is_async_online_lecture
 
 class EventWrapper():
 
@@ -58,16 +58,20 @@ class EventWrapper():
 
         #default values for category and reminder time --> ToDo: move to config.py .env
         category = "Vorlesung"
+        reminder_on = True
         reminder_time = 15
 
         if self.location != "-":
-            mci_location = self.location.split("/ ")[1]
+            room, mci_location, *_ = self.location.split(" / ")
 
-            if at_different_location(mci_location):
+            if is_async_online_lecture(self.subject, room):
+                appt.BusyStatus = 0 # olFree = 0 --> maybe go to  olTentative = 1
+                reminder_on = False
+            elif at_different_location(mci_location):
                 category = "Vorlesung-Anderer-Standort"
                 reminder_time += get_travel_time(mci_location)
 
-        appt.ReminderSet = not is_past
+        appt.ReminderSet = (not is_past) and (reminder_on)
         appt.ReminderMinutesBeforeStart = reminder_time       
         appt.Categories = category
 
