@@ -63,7 +63,19 @@ def update_changed_events(webcalender, outlook):
     outlook_appointment_dict = {appointment.Organizer: appointment for appointment in found_appointments}
 
     all_events = [subcomp for subcomp in webcalendar.subcomponents if subcomp.name == "VEVENT"]
-    lecture_events = [event for event in all_events if not "Abgabetermin" in event['summary']]
+
+    lecture_events = []
+    for event in all_events:
+        # skip submission dates
+        if "Abgabetermin" in event["summary"]:
+            continue
+
+        # skip all events that are stemming from your own SAKAI calendar
+        # UID of event is either "MCI-DESIGNER-TERMIN-xxxx" or "MCI-SAKAI-TERMIN-xxxx"
+        if "MCI-SAKAI-TERMIN" in event["uid"]:
+            continue
+        
+        lecture_events.append(event)
 
     # create a dict of all found events
     lecture_event_dict: dict[str, EventWrapper] = {}
@@ -71,7 +83,7 @@ def update_changed_events(webcalender, outlook):
         ical_event_wrapped = EventWrapper.from_ical_event(event)
         lecture_event_dict[ical_event_wrapped.organizer] = ical_event_wrapped
 
-    logging.info(F"Found {len(lecture_events)} ical events")
+    logging.info(F"Found {len(lecture_events)} lecture ical events out of {len(all_events)} total events")
 
     for ical_event_wrapped in lecture_event_dict.values():
         # get corresponding outlook appointment from dict
