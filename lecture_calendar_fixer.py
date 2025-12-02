@@ -10,6 +10,7 @@ import requests
 import win32com.client
 
 from event import EventWrapper
+from api_call import load_from_mymci_api
 
 def delete_all_existing_lecture_events(outlook):
     outlook_calendar = outlook.GetNamespace("MAPI").GetDefaultFolder(9) #calender = 9
@@ -54,16 +55,19 @@ def try_deleting_outlook_appointment(appointment) -> bool:
         attempts += 1
     return False
 
-def update_changed_events(webcalender, outlook):
-    outlook_calendar = outlook.GetNamespace("MAPI").GetDefaultFolder(9) #calender = 9
-    appointments = outlook_calendar.Items
+def webcal_dict_to_wrapper(webcalendar_dict: list[dict]) -> list[EventWrapper]:
+    lecture_events = []
+    for event in webcalendar_dict:
+        # skip submission dates
+        if event["art"] not in ["Lehrveranstaltung", "Prüfung", "Sonstiges"]:
+            continue
 
-    found_appointments = [appointment for appointment in appointments if EventWrapper.get_default_organizer() in getattr(appointment, "Organizer", "Error")]
-    logging.info(F"Found {len(found_appointments)} outlook appointments")
-    outlook_appointment_dict = {appointment.Organizer: appointment for appointment in found_appointments}
+        lecture_events.append(EventWrapper.from_api_dict(event))
 
+    return lecture_events
+
+def webcal_to_wrapper(webcalendar) -> list[EventWrapper]:
     all_events = [subcomp for subcomp in webcalendar.subcomponents if subcomp.name == "VEVENT"]
-
     lecture_events = []
     for event in all_events:
         # skip submission dates
@@ -75,39 +79,48 @@ def update_changed_events(webcalender, outlook):
         if "MCI-SAKAI-TERMIN" in event["uid"]:
             continue
         
-        lecture_events.append(event)
+        lecture_events.append(EventWrapper.from_ical_event(event))
+    
+    return lecture_events
 
-    # create a dict of all found events
+def update_changed_events(wrapped_events: list[EventWrapper], outlook):
+    outlook_calendar = outlook.GetNamespace("MAPI").GetDefaultFolder(9) #calender = 9
+    appointments = outlook_calendar.Items
+
+    found_appointments = [appointment for appointment in appointments if EventWrapper.get_default_organizer() in getattr(appointment, "Organizer", "Error")]
+    logging.info(F"Found {len(found_appointments)} outlook appointments")
+    outlook_appointment_dict = {appointment.Organizer: appointment for appointment in found_appointments}
+
+    # create a dict of all found/imported events
     lecture_event_dict: dict[str, EventWrapper] = {}
-    for event in lecture_events:
-        ical_event_wrapped = EventWrapper.from_ical_event(event)
-        lecture_event_dict[ical_event_wrapped.organizer] = ical_event_wrapped
+    for event in wrapped_events:
+        lecture_event_dict[event.organizer] = event
 
-    logging.info(F"Found {len(lecture_events)} lecture ical events out of {len(all_events)} total events")
+    logging.info(F"Found {len(wrapped_events)} lecture ical events")
 
-    for ical_event_wrapped in lecture_event_dict.values():
+    for imported_event in lecture_event_dict.values():
         # get corresponding outlook appointment from dict
-        corresponding_outlook_appointment = outlook_appointment_dict.get(ical_event_wrapped.organizer)
+        corresponding_outlook_appointment = outlook_appointment_dict.get(imported_event.organizer)
 
         if corresponding_outlook_appointment:
             # if found wrap it for comparison
             outlook_appointment_wrapped = EventWrapper.from_outlook_event(corresponding_outlook_appointment)
             
-            if ical_event_wrapped != outlook_appointment_wrapped:
+            if imported_event != outlook_appointment_wrapped:
                 # event has changed --> delete and add again
                 logging.info(F"\nTrying to delete appointment:\n\t{outlook_appointment_wrapped}")
                 if try_deleting_outlook_appointment(corresponding_outlook_appointment):
                     #also remove from dict
-                    del outlook_appointment_dict[ical_event_wrapped.organizer]
+                    del outlook_appointment_dict[imported_event.organizer]
 
-                logging.info(F"\nAdding event:\n\t{ical_event_wrapped}")
-                ical_event_wrapped.to_outlook_event(outlook)
+                logging.info(F"\nAdding event:\n\t{imported_event}")
+                imported_event.to_outlook_event(outlook)
             else:
-                logging.info(F"\nAppointment is up to date:\n\t{ical_event_wrapped}")
+                logging.info(F"\nAppointment is up to date:\n\t{imported_event}")
         else:
             # if it is not available then add it
-            logging.info(F"\nAdding event:\n\t{ical_event_wrapped}")
-            ical_event_wrapped.to_outlook_event(outlook)
+            logging.info(F"\nAdding event:\n\t{imported_event}")
+            imported_event.to_outlook_event(outlook)
 
     # More outlook appointments than ical events --> something has been deleted in the ical events
     if len(outlook_appointment_dict) > len(lecture_event_dict):
@@ -119,23 +132,7 @@ def update_changed_events(webcalender, outlook):
                 if outlook_appointment_wrapped.start_dt > datetime.datetime.now(outlook_appointment_wrapped.start_dt.tzinfo):
                     logging.info(F"\nTrying to delete appointment:\n\t{outlook_appointment_wrapped}")
                     if try_deleting_outlook_appointment(outlook_appointment):
-                        del outlook_appointment_dict[ical_event_wrapped.organizer]
-
-def update_hash_file(webcalendar):
-    # turn all events into a string and hash it
-    all_events = [subcomp for subcomp in webcalendar.subcomponents if subcomp.name == "VEVENT"]
-    full_string = "".join([str(EventWrapper.from_ical_event(event)) for event in all_events if not "Abgabetermin" in event['summary']])
-
-    with open("./.hash", "a+") as f:
-        f.seek(0)
-        old_hash = f.read()
-        new_hash = hashlib.sha256(str(full_string).encode('utf-8')).hexdigest()
-        if old_hash == new_hash:
-            logging.info("No changes in hash --> will continue anyway for now")
-        else:
-            logging.info("Hash changed --> will update")
-            f.truncate(0)
-            f.write(new_hash)
+                        del outlook_appointment_dict[imported_event.organizer]
 
 if __name__ == "__main__":
     #Dynamically load the type info for the underlying COM object. This data can be generated with the following command:
@@ -152,24 +149,32 @@ if __name__ == "__main__":
     logging.basicConfig(filename=logfile_path, encoding='utf-8', level=logging.DEBUG)
 
     # .env file with webcal link as http link must be available
-    url = os.getenv("WEBCAL_URL")
-    if url is None:
-        logging.error("No webcal url found in .env file")
+    #url = os.getenv("WEBCAL_URL")
+    #if url is None:
+    #    logging.error("No webcal url found in .env file")
+    #    exit(1)
+    #
+    #logging.info(F"Running at {datetime.datetime.now()}")
+    #try:
+    #    response = requests.get(url)
+    #except requests.exceptions.RequestException as e:
+    #    logging.error(F"Could not fetch calendar: {e}")
+    #    exit(1)   
+    #
+    #webcalendar = icalendar.Calendar.from_ical(response.text)
+
+    user = os.getenv("USER")
+    if user is None:
+        logging.error("No user found in api.env file")
         exit(1)
 
-    logging.info(F"Running at {datetime.datetime.now()}")
-    try:
-        response = requests.get(url)
-    except requests.exceptions.RequestException as e:
-        logging.error(F"Could not fetch calendar: {e}")
-        exit(1)   
+    webcalendar = load_from_mymci_api(user)
+    wrapped_events = webcal_dict_to_wrapper(webcalendar)
 
-    webcalendar = icalendar.Calendar.from_ical(response.text)
-    update_hash_file(webcalendar)
-    
-    outlook = win32com.client.Dispatch("Outlook.Application")
+    #wrapped_events = webcal_to_wrapper(webcalendar)
 
     #delete_all_existing_lecture_events(outlook)
     #add_lecture_events_to_outlook(webcalendar, outlook)
 
-    update_changed_events(webcalendar, outlook)
+    outlook = win32com.client.Dispatch("Outlook.Application")
+    update_changed_events(wrapped_events, outlook)
