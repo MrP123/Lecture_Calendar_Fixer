@@ -7,13 +7,15 @@ from config import get_travel_time, at_different_location, is_async_online_lectu
 
 class EventWrapper():
 
-    def __init__(self, subject: str, start: str, duration: int, location: str, organizer: str | None = None, start_dt: datetime | None = None) -> None:
+    def __init__(self, subject: str, start: str, duration: int, location: str, organizer: str | None = None, start_dt: datetime | None = None, is_online: bool = False, kind: str = "Lehrveranstaltung") -> None:
         self.subject = subject
         self.start = start
         self.duration = duration
         self.location = location
         self.start_dt = start_dt
         self.organizer = organizer if organizer else EventWrapper.get_default_organizer()
+        self.is_online = is_online
+        self.kind = kind
 
     @classmethod
     def from_ical_event(cls, event: ICalEvent):
@@ -29,6 +31,30 @@ class EventWrapper():
         organizer = str(organizer) if organizer else cls.get_default_organizer()
 
         return cls(subject, start, dur, location, organizer=organizer, start_dt=start_dt)
+    
+    @classmethod
+    def from_api_dict(cls, api_dict: dict):
+        subject = api_dict["title"]
+
+        start_dt = datetime.fromisoformat(api_dict["start"])
+        end_dt = datetime.fromisoformat(api_dict["end"])
+        dur = int((end_dt - start_dt).total_seconds() / 60)
+        start = start_dt.strftime("%Y-%m-%d %H:%M")
+
+        kind = api_dict["art"]
+        is_online = api_dict["online"]
+
+        raeume = api_dict.get("raeume", []) 
+        raum = raeume[0] if raeume else None #returns list of dicts
+        location = f"{raum['raum']} / {raum['standort']}" if raum else "-" # print as "Room / Location"
+
+        id = api_dict["id"]
+        if id[0].isnumeric():
+            organizer = f"{cls.get_default_organizer()}-{id}"
+        else:
+            organizer = cls.get_default_organizer()
+
+        return cls(subject, start, dur, location, organizer=organizer, start_dt=start_dt, is_online=is_online, kind=kind)
     
     @classmethod
     def from_outlook_event(cls, event):
@@ -70,6 +96,8 @@ class EventWrapper():
             elif at_different_location(mci_location):
                 category = "Vorlesung-Anderer-Standort"
                 reminder_time += get_travel_time(mci_location)
+            elif self.kind not in ["Lehrveranstaltung", "Prüfung", "Sonstiges"]:
+                appt.BusyStatus = 0 # olFree = 0 --> maybe go to  olTentative = 1
 
         appt.ReminderSet = (not is_past) and (reminder_on)
         appt.ReminderMinutesBeforeStart = reminder_time       

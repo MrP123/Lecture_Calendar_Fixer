@@ -1,118 +1,121 @@
-import os
+import logging
 
 import requests
 import hashlib
 
-from dotenv import load_dotenv
+import keyring
 
-load_dotenv("api.env")
+def load_from_mymci_api(user: str, keyring_system: str = "lecture_calendar_fixer") -> list[dict]:
+    password = keyring.get_password(keyring_system, user)
 
-user = os.getenv("USER")
-password = os.getenv("PASS")
+    if password is None:
+        logging.error(F"No password found in system keyring for user: {user}. Please set it beforehand")
+        logging.error("To do so, run: `python -m keyring set lecture_calendar_fixer <username>`")
+        exit(1)
 
-session = requests.Session()
+    session = requests.Session()
+    DEVICE_FINGERPRINT = hashlib.sha256(user.encode()).hexdigest() #arbitrary design choice
 
-# --- Configuration ---
-DEVICE_FINGERPRINT = hashlib.sha256(user.encode()).hexdigest()
+    BASE_URL = "https://callmyapi.mci4me.at"
+    LOGIN_URL = f"{BASE_URL}/api/my/4/auth/credentials?lang=de"
+    TERMINE_URL = f"{BASE_URL}/api/my/4/termine?lang=de"
 
-BASE_URL = "https://callmyapi.mci4me.at"
-LOGIN_URL = f"{BASE_URL}/api/my/4/auth/credentials?lang=de"
-TERMINE_URL = f"{BASE_URL}/api/my/4/termine?lang=de"
-
-# ---------------------------------------------------------
-# Create a reusable session (same as PowerShell WebRequestSession)
-# ---------------------------------------------------------
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/142.0.0.0 Safari/537.36",
-})
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/142.0.0.0 Safari/537.36",
+    })
 
 
-# ---------------------------------------------------------
-# 1) LOGIN REQUEST  (POST)
-# ---------------------------------------------------------
-login_headers = {
-    "authority": "callmyapi.mci4me.at",
-    "method": "POST",
-    "path": "/api/my/4/auth/credentials?lang=de",
-    "scheme": "https",
-    "accept": "application/json",
-    "accept-encoding": "gzip, deflate, br, zstd",
-    "accept-language": "de-DE,de;q=0.8",
-    "origin": "https://my.mci4me.at",
-    "priority": "u=1, i",
-    "referer": "https://my.mci4me.at/",
-    "sec-ch-ua": '"Chromium";v="142", "Brave";v="142", "Not_A Brand";v="99"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"Windows"',
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site",
-    "sec-gpc": "1",
-    "software-version": "2.0.0-beta.9",
-    "x-device-fingerprint": DEVICE_FINGERPRINT,
-    "x-platform": "desktop",
-    "Content-Type": "application/json"
-}
+    login_headers = {
+        "authority": "callmyapi.mci4me.at",
+        "method": "POST",
+        "path": "/api/my/4/auth/credentials?lang=de",
+        "scheme": "https",
+        "accept": "application/json",
+        "accept-encoding": "gzip, deflate, br, zstd",
+        "accept-language": "de-DE,de;q=0.8",
+        "origin": "https://my.mci4me.at",
+        "priority": "u=1, i",
+        "referer": "https://my.mci4me.at/",
+        "sec-ch-ua": '"Chromium";v="142", "Brave";v="142", "Not_A Brand";v="99"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-gpc": "1",
+        "software-version": "2.0.0-beta.9",
+        "x-device-fingerprint": DEVICE_FINGERPRINT,
+        "x-platform": "desktop",
+        "Content-Type": "application/json"
+    }
 
-login_payload = {
-    "username": user,
-    "password": password,
-    "deviceFingerprint": DEVICE_FINGERPRINT
-}
+    login_payload = {
+        "username": user,
+        "password": password,
+        "deviceFingerprint": DEVICE_FINGERPRINT
+    }
 
-login_response = session.post(
-    LOGIN_URL,
-    headers=login_headers,
-    json=login_payload
-)
+    login_response = session.post(
+        LOGIN_URL,
+        headers=login_headers,
+        json=login_payload
+    )
 
-login_response.raise_for_status()
-data = login_response.json()
-auth_token = data.get("token").get("auth_token")
+    try:
+        login_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logging.error(F"Could not authenticate with myMCI API: {e}")
+        exit(1)
 
-print("Auth token:", auth_token)
+    data = login_response.json()
+    auth_token = data.get("token").get("auth_token")
 
-# Headers for GET /termine
-termine_headers = {
-    "authority": "callmyapi.mci4me.at",
-    "method": "GET",
-    "path": "/api/my/4/termine?lang=de",
-    "scheme": "https",
-    "accept": "application/json",
-    "accept-encoding": "gzip, deflate, br, zstd",
-    "accept-language": "de-DE,de;q=0.8",
-    "authorization": f"Bearer {auth_token}",
-    "origin": "https://my.mci4me.at",
-    "priority": "u=1, i",
-    "referer": "https://my.mci4me.at/",
-    "sec-ch-ua": '"Chromium";v="142", "Brave";v="142", "Not_A Brand";v="99"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"Windows"',
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site",
-    "sec-gpc": "1",
-    "software-version": "2.0.0-beta.9",
-    "x-device-fingerprint": DEVICE_FINGERPRINT,
-    "x-platform": "desktop",
-}
+    if auth_token is None:
+        logging.error("Could not retrieve auth token from login response")
+        exit(1)
 
-session.headers.update(termine_headers)
+    termine_headers = {
+        "authority": "callmyapi.mci4me.at",
+        "method": "GET",
+        "path": "/api/my/4/termine?lang=de",
+        "scheme": "https",
+        "accept": "application/json",
+        "accept-encoding": "gzip, deflate, br, zstd",
+        "accept-language": "de-DE,de;q=0.8",
+        "authorization": f"Bearer {auth_token}",
+        "origin": "https://my.mci4me.at",
+        "priority": "u=1, i",
+        "referer": "https://my.mci4me.at/",
+        "sec-ch-ua": '"Chromium";v="142", "Brave";v="142", "Not_A Brand";v="99"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "sec-gpc": "1",
+        "software-version": "2.0.0-beta.9",
+        "x-device-fingerprint": DEVICE_FINGERPRINT,
+        "x-platform": "desktop",
+    }
 
-appointment_response = session.get(
-    TERMINE_URL,
-    headers=termine_headers
-)
+    session.headers.update(termine_headers)
 
-appointment_response.raise_for_status()
-appointments = appointment_response.json()
+    appointment_response = session.get(
+        TERMINE_URL,
+        headers=termine_headers
+    )
 
-session.close()
+    try:
+        appointment_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logging.error(F"Could not fetch calendar: {e}")
+        exit(1)
 
-for appointment in appointments:
-    for key, value in appointment.items():
-        print(f"{key}: {value}")
+    appointments = appointment_response.json()
 
+    session.close()
+
+    return appointments
