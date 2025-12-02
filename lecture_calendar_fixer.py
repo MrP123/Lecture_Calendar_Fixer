@@ -1,7 +1,6 @@
 import logging
 import datetime
 import os
-import hashlib
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -121,22 +120,6 @@ def update_changed_events(webcalender, outlook):
                     if try_deleting_outlook_appointment(outlook_appointment):
                         del outlook_appointment_dict[ical_event_wrapped.organizer]
 
-def update_hash_file(webcalendar):
-    # turn all events into a string and hash it
-    all_events = [subcomp for subcomp in webcalendar.subcomponents if subcomp.name == "VEVENT"]
-    full_string = "".join([str(EventWrapper.from_ical_event(event)) for event in all_events if not "Abgabetermin" in event['summary']])
-
-    with open("./.hash", "a+") as f:
-        f.seek(0)
-        old_hash = f.read()
-        new_hash = hashlib.sha256(str(full_string).encode('utf-8')).hexdigest()
-        if old_hash == new_hash:
-            logging.info("No changes in hash --> will continue anyway for now")
-        else:
-            logging.info("Hash changed --> will update")
-            f.truncate(0)
-            f.write(new_hash)
-
 if __name__ == "__main__":
     #Dynamically load the type info for the underlying COM object. This data can be generated with the following command:
     #python .\.venv\Lib\site-packages\win32com\client\makepy.py -i "Microsoft Outlook 16.0 Object Library"
@@ -165,7 +148,6 @@ if __name__ == "__main__":
         exit(1)   
 
     webcalendar = icalendar.Calendar.from_ical(response.text)
-    update_hash_file(webcalendar)
     
     outlook = win32com.client.Dispatch("Outlook.Application")
 
