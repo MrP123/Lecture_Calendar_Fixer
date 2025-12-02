@@ -55,14 +55,14 @@ print(f"Login response status: {login_response.status_code}")
 print(f"Login response text: {login_response.text}")
 
 
-timetable_url = "https://my.mci4me.at/?request=timetable&mode=my&json=1"
+timetable_url = "https://callmyapi.mci4me.at/api/my/4/termine?lang=de"
 json_headers = {
-    "authority": "my.mci4me.at",
+    "authority": "callmyapi.mci4me.at",
     "accept": "application/json, text/javascript, */*; q=0.01",
     "accept-encoding": "gzip, deflate, br, zstd",
     "accept-language": "de-DE,de;q=0.8",
     "priority": "u=1, i",
-    "referer": "https://my.mci4me.at/?request=timetable&mode=my",
+    "referer": "https://my.mci4me.at/",
     "sec-ch-ua": '"Chromium";v="140", "Not=A?Brand";v="24", "Brave";v="140"',
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": '"Windows"',
