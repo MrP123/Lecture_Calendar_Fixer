@@ -2,7 +2,7 @@
 
 ## Setup
 
-1. Install Python 3.11+
+1. Install Python 3.13+
 2. Rename the file `.env.template` in the root directory to `.env`.
 3. Within the `.env ` file find the key `WEBCAL_URL` and insert the URL to your exported calendar from myMCI as a string. Follow the example in the `.env` file.
 4. Create a virtual environment with `python -m venv .venv`
