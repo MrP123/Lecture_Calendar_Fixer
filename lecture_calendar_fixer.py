@@ -11,6 +11,7 @@ import requests
 
 from event import EventWrapper
 from api_call import load_from_mymci_api
+import config
 
 def delete_all_existing_lecture_events(outlook):
     outlook_calendar = outlook.GetNamespace("MAPI").GetDefaultFolder(9)  # calendar = 9
@@ -154,29 +155,39 @@ if __name__ == "__main__":
     logging.basicConfig(filename=logfile_path, encoding='utf-8', level=logging.DEBUG)
     logging.info(f"Running at {datetime.datetime.now()}")
 
-    # .env file with webcal link as http link must be available
-    #url = os.getenv("WEBCAL_URL")
-    #if url is None:
-    #    logging.error("No webcal url found in .env file")
-    #    exit(1)
-    #
-    #try:
-    #    response = requests.get(url)
-    #except requests.exceptions.RequestException as e:
-    #    logging.error(F"Could not fetch calendar: {e}")
-    #    exit(1)   
-    #
-    #webcalendar = icalendar.Calendar.from_ical(response.text)
-
-    user = os.getenv("USER")
-    if user is None:
-        logging.error("No user found in .env file")
+    if config.use_ical_link() and config.use_api_call():
+        logging.error("Both use_ical_link and use_api_call are set to True in config.py. Please choose only one method to fetch events.")
         exit(1)
 
-    webcalendar = load_from_mymci_api(user)
-    wrapped_events = webcal_dict_to_wrapper(webcalendar)
+    if not (config.use_ical_link() or config.use_api_call()):
+        logging.error("Both use_ical_link and use_api_call are set to False in config.py. Please choose one method to fetch events.")
+        exit(1)
 
-    #wrapped_events = webcal_to_wrapper(webcalendar)
+    if config.use_ical_link():
+        url = os.getenv("WEBCAL_URL")
+        if url is None:
+            logging.error("No webcal url found in .env file")
+            exit(1)
+        
+        try:
+            response = requests.get(url)
+        except requests.exceptions.RequestException as e:
+            logging.error(F"Could not fetch calendar: {e}")
+            exit(1)   
+        
+        webcalendar = icalendar.Calendar.from_ical(response.text)
+        wrapped_events = webcal_to_wrapper(webcalendar)
+
+    elif config.use_api_call():
+        user = os.getenv("USER")
+        if user is None:
+            logging.error("No user found in .env file")
+            exit(1)
+
+        webcalendar = load_from_mymci_api(user)
+        wrapped_events = webcal_dict_to_wrapper(webcalendar)
+
+
     #delete_all_existing_lecture_events(outlook)
     #add_lecture_events_to_outlook(webcalendar, outlook)
 

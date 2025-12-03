@@ -1,4 +1,12 @@
 
+def use_ical_link() -> bool:
+    """Check if the user wants to use an iCal link for fetching events"""
+    return True
+
+def use_api_call() -> bool:
+    """Check if the user wants to use the myMCI API for fetching events"""
+    return False
+
 def is_async_online_lecture(subject:str, room: str) -> bool:
     """Check if an event is an asynchronous online lecutre"""
     return "Geleitetes Selbststudium" in subject and room == "Online"
