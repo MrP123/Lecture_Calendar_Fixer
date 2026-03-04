@@ -48,6 +48,13 @@ class EventWrapper():
         raum = raeume[0] if raeume else None #returns list of dicts
         location = f"{raum['raum']} / {raum['standort']}" if raum else "-" # print as "Room / Location"
 
+        groups = api_dict.get("gruppen", [])
+        group = groups[0] if groups else None #returns list of dicts
+        
+        if group:
+            group_name = group["bezeichnung"]
+            subject += f" | {group_name}"
+
         id = api_dict["id"]
         if id[0].isnumeric():
             organizer = f"{cls.get_default_organizer()}-{id}"
